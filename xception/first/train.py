@@ -6,6 +6,9 @@ from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten, Conv2D,
 from tensorflow.keras.models import Sequential, Model, load_model
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, Callback
 import matplotlib.pyplot as plt
+import os
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -15,23 +18,24 @@ image_size = (299, 299)  # Fit images to this size
 class_count = 120
 
 batch_size = 20
-epochs = 15
+epochs = 30
 
 learning_rate = 0.001
-momentum = 0.8
+momentum = 0.9
+decay = 1e-6
 
 early_stopping_patience = 2
 
-data_augmentation = ImageDataGenerator(rotation_range=15,
+data_augmentation = ImageDataGenerator(rotation_range=10,
                                        width_shift_range=0.15,
                                        height_shift_range=0.15,
                                        shear_range=0.01,
-                                       zoom_range=[0.8, 1.2],
+                                       zoom_range=[0.7, 1.3],
                                        horizontal_flip=True,
                                        vertical_flip=False,
                                        fill_mode='reflect',
                                        data_format='channels_last',
-                                       brightness_range=[0.7, 1.2])
+                                       brightness_range=[0.7, 1.3])
 
 main_dir = "/home/yonathantzur1/dogs/"
 train_dir = "xception/first/"
@@ -53,7 +57,7 @@ class LossAccHistory(Callback):
 
 def print_acc(history):
     train_acc = history['acc']
-    validation_acc = history['val_accuracy']
+    validation_acc = history['val_acc']
 
     # Create the plot
     plt.plot(train_acc)
@@ -157,7 +161,7 @@ def train_model(model_name=None):
 
     # Compile the final modal with loss and optimizer.
     model_final.compile(loss="categorical_crossentropy",
-                        optimizer=optimizers.SGD(lr=learning_rate, momentum=momentum),
+                        optimizer=optimizers.SGD(lr=learning_rate, decay=decay, momentum=momentum),
                         metrics=["accuracy"])
 
     model_final.summary()
@@ -166,9 +170,9 @@ def train_model(model_name=None):
 
     # Initializing monitoring params for training.
     history = LossAccHistory()
-    early = EarlyStopping(monitor='val_accuracy', min_delta=0, patience=early_stopping_patience, verbose=1, mode='auto')
+    early = EarlyStopping(monitor='val_acc', min_delta=0, patience=early_stopping_patience, verbose=1, mode='auto')
     network_file_name = main_dir + train_dir + "model.h5"
-    checkpoint = ModelCheckpoint(network_file_name, monitor='val_accuracy', verbose=1,
+    checkpoint = ModelCheckpoint(network_file_name, monitor='val_acc', verbose=1,
                                  save_best_only=True, save_weights_only=False, mode='auto')
 
     print("Train...")
@@ -187,11 +191,29 @@ def train_model(model_name=None):
     train_time_in_minutes = int((train_end_time - train_start_time) / 60)
 
     print("-------Done-------")
+    email_alert('Train')
 
     print_acc(model_history.history)
     print_loss(model_history.history)
     print_time_log(train_time_in_minutes)
     calculate_test_accuracy(model_final)
+    email_alert('Test')
+
+
+def email_alert(msg):
+    message = Mail(
+        from_email='ml@dogs.com',
+        to_emails=os.environ.get('MAIL_ADDRESS'),
+        subject=msg,
+        html_content='done :)')
+    try:
+        sg = SendGridAPIClient(os.environ.get('MAILER_CODE'))
+        response = sg.send(message)
+        print(response.status_code)
+        print(response.body)
+        print(response.headers)
+    except Exception as e:
+        print(e.message)
 
 
 if __name__ == '__main__':
