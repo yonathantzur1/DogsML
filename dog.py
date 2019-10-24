@@ -6,11 +6,15 @@ import base64
 import numpy as np
 from PIL import Image
 from io import BytesIO
+from flask import Flask
+from flask import request
 
 input_path = "./input/"
 model_path = "./models/xception.h5"
 
 image_size = [299, 299]
+
+app = Flask(__name__)
 
 dogs = ['Chihuahua', 'Japanese_spaniel', 'Maltese_dog', 'Pekinese', 'Shih', 'Blenheim_spaniel', 'papillon',
         'toy_terrier', 'Rhodesian_ridgeback', 'Afghan_hound', 'basset', 'beagle', 'bloodhound', 'bluetick', 'black',
@@ -35,13 +39,14 @@ dogs = ['Chihuahua', 'Japanese_spaniel', 'Maltese_dog', 'Pekinese', 'Shih', 'Ble
 
 def find_dog(img_str):
     img_arr = img_to_array(img_str)
-    model = load_model(model_path)
     output = list(list(model.predict(img_arr))[0])
     max_value = max(output)
     max_index = output.index(max_value)
 
-    print("Dog: " + dogs[max_index])
-    print("Accuracy: " + str(max_value * 100) + "%")
+    return {
+        "dog": dogs[max_index],
+        "accuracy": str(max_value * 100) + "%"
+    }
 
 
 def img_to_array(base64_img):
@@ -50,6 +55,11 @@ def img_to_array(base64_img):
                     np.float32).reshape(1, img.size[1], img.size[0], 3)
 
 
+@app.route('/findDog', methods=["POST"])
+def find():
+    return find_dog(request.json["img"])
+
+
 if __name__ == '__main__':
-    b64_img = "base64 string"
-    find_dog(b64_img)
+    model = load_model(model_path)
+    app.run()
