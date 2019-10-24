@@ -9,7 +9,6 @@ from io import BytesIO
 from flask import Flask
 from flask import request
 
-input_path = "./input/"
 model_path = "./models/xception.h5"
 
 image_size = [299, 299]
@@ -62,4 +61,4 @@ def find():
 
 if __name__ == '__main__':
     model = load_model(model_path)
-    app.run()
+    app.run(host='0.0.0.0', port=5000)
